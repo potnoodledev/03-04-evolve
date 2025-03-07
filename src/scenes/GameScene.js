@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { EnemyFactory } from '../scripts/enemies';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -40,9 +41,44 @@ export default class GameScene extends Phaser.Scene {
     this.enemiesPerWave = 5;
     this.enemySpawnRate = 3000; // ms between enemy spawns
     this.lastEnemySpawn = 0;
-    this.enemySpeed = 75;
-    this.enemyHealth = 50;
-    this.enemyDamage = 10;
+    
+    // Enemy settings
+    this.enemySettings = {
+      basic: {
+        health: 50,
+        damage: 10,
+        speed: 75
+      },
+      blinker: {
+        health: 70,
+        damage: 15,
+        speed: 100,
+        blinkTime: 2000,
+        blinkInterval: 5000
+      },
+      zigzag: {
+        health: 40,
+        damage: 8,
+        speed: 90,
+        amplitude: 50,
+        frequency: 0.02
+      },
+      circular: {
+        health: 60,
+        damage: 12,
+        speed: 85,
+        orbitDistance: 150,
+        orbitSpeed: 0.02
+      }
+    };
+    
+    // Enemy spawn settings
+    this.lastBlinkerSpawn = 0;
+    this.blinkerSpawnRate = 5000; // 5 seconds between blinker spawns
+    this.lastZigzagSpawn = 0;
+    this.zigzagSpawnRate = 7000; // 7 seconds between zigzag spawns
+    this.lastCircularSpawn = 0;
+    this.circularSpawnRate = 10000; // 10 seconds between circular spawns
     
     // Map settings
     this.mapWidth = 1600;
@@ -75,6 +111,9 @@ export default class GameScene extends Phaser.Scene {
     // Set up controls
     this.setupControls();
     
+    // Setup enemy events
+    this.setupEnemyEvents();
+    
     // Start game timer
     this.time.addEvent({
       delay: 1000,
@@ -85,7 +124,7 @@ export default class GameScene extends Phaser.Scene {
     
     // Start wave timer
     this.time.addEvent({
-      delay: 30000, // 30 seconds between waves
+      delay: 8000, // 8 seconds between waves
       callback: this.increaseWave,
       callbackScope: this,
       loop: true
@@ -364,72 +403,123 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handleEnemySpawning(time) {
+    // Spawn basic enemies
     if (time > this.lastEnemySpawn + this.enemySpawnRate) {
-      this.spawnEnemy();
+      this.spawnBasicEnemy();
       this.lastEnemySpawn = time;
+    }
+    
+    // Spawn blinker enemies in wave 2 and beyond
+    if (this.waveNumber >= 2 && time > this.lastBlinkerSpawn + this.blinkerSpawnRate) {
+      this.spawnBlinkerEnemy();
+      this.lastBlinkerSpawn = time;
+    }
+    
+    // Spawn zigzag enemies in wave 3 and beyond
+    if (this.waveNumber >= 3 && time > this.lastZigzagSpawn + this.zigzagSpawnRate) {
+      this.spawnZigzagEnemy();
+      this.lastZigzagSpawn = time;
+    }
+    
+    // Spawn circular enemies in wave 4 and beyond
+    if (this.waveNumber >= 4 && time > this.lastCircularSpawn + this.circularSpawnRate) {
+      this.spawnCircularEnemy();
+      this.lastCircularSpawn = time;
     }
   }
 
-  spawnEnemy() {
-    // Determine spawn position (outside camera view)
-    const side = Phaser.Math.Between(0, 3); // 0: top, 1: right, 2: bottom, 3: left
-    let x, y;
+  spawnBasicEnemy() {
+    // Get spawn position outside camera view
+    const spawnPos = EnemyFactory.getSpawnPositionOutsideCamera(
+      this, 
+      this.player, 
+      { width: this.mapWidth, height: this.mapHeight }
+    );
     
-    const cameraX = this.cameras.main.scrollX;
-    const cameraY = this.cameras.main.scrollY;
-    const cameraWidth = this.cameras.main.width;
-    const cameraHeight = this.cameras.main.height;
+    // Create enemy using factory
+    EnemyFactory.createEnemy(
+      this, 
+      spawnPos.x, 
+      spawnPos.y, 
+      'basic', 
+      this.enemySettings.basic
+    );
+  }
+
+  spawnBlinkerEnemy() {
+    // Get spawn position near player
+    const spawnPos = EnemyFactory.getSpawnPositionNearPlayer(
+      this.player,
+      200,
+      300,
+      { width: this.mapWidth, height: this.mapHeight }
+    );
     
-    const buffer = 100; // Spawn outside camera view
+    // Create blinker enemy using factory
+    EnemyFactory.createEnemy(
+      this, 
+      spawnPos.x, 
+      spawnPos.y, 
+      'blinker', 
+      this.enemySettings.blinker
+    );
+  }
+
+  spawnZigzagEnemy() {
+    // Get spawn position outside camera view
+    const spawnPos = EnemyFactory.getSpawnPositionOutsideCamera(
+      this, 
+      this.player, 
+      { width: this.mapWidth, height: this.mapHeight }
+    );
     
-    switch (side) {
-      case 0: // Top
-        x = Phaser.Math.Between(cameraX - buffer, cameraX + cameraWidth + buffer);
-        y = cameraY - buffer;
-        break;
-      case 1: // Right
-        x = cameraX + cameraWidth + buffer;
-        y = Phaser.Math.Between(cameraY - buffer, cameraY + cameraHeight + buffer);
-        break;
-      case 2: // Bottom
-        x = Phaser.Math.Between(cameraX - buffer, cameraX + cameraWidth + buffer);
-        y = cameraY + cameraHeight + buffer;
-        break;
-      case 3: // Left
-        x = cameraX - buffer;
-        y = Phaser.Math.Between(cameraY - buffer, cameraY + cameraHeight + buffer);
-        break;
-    }
+    // Create zigzag enemy using factory
+    EnemyFactory.createEnemy(
+      this, 
+      spawnPos.x, 
+      spawnPos.y, 
+      'zigzag', 
+      this.enemySettings.zigzag
+    );
+  }
+
+  spawnCircularEnemy() {
+    // Get spawn position outside camera view
+    const spawnPos = EnemyFactory.getSpawnPositionOutsideCamera(
+      this, 
+      this.player, 
+      { width: this.mapWidth, height: this.mapHeight }
+    );
     
-    // Ensure spawn is within world bounds
-    x = Phaser.Math.Clamp(x, 0, this.mapWidth);
-    y = Phaser.Math.Clamp(y, 0, this.mapHeight);
-    
-    // Create enemy
-    const enemy = this.enemies.create(x, y, 'enemy');
-    enemy.setDepth(5);
-    
-    // Set enemy properties
-    enemy.health = this.enemyHealth;
-    enemy.damage = this.enemyDamage;
-    enemy.speed = this.enemySpeed;
-    enemy.setSize(40, 40);
-    enemy.body.setCircle(20);
+    // Create circular enemy using factory
+    EnemyFactory.createEnemy(
+      this, 
+      spawnPos.x, 
+      spawnPos.y, 
+      'circular', 
+      this.enemySettings.circular
+    );
   }
 
   updateEnemies() {
     this.enemies.getChildren().forEach((enemy) => {
-      // Move towards player
-      const dx = this.player.x - enemy.x;
-      const dy = this.player.y - enemy.y;
-      const angle = Math.atan2(dy, dx);
-      
-      enemy.rotation = angle;
-      
-      enemy.setVelocity(
-        Math.cos(angle) * enemy.speed,
-        Math.sin(angle) * enemy.speed
-      );
+      // Use the enemy's update method if it exists (for our custom Enemy classes)
+      if (enemy.update) {
+        enemy.update(this.player);
+      } else {
+        // Fallback for any enemies that might not be using our new system
+        // Move towards player
+        const dx = this.player.x - enemy.x;
+        const dy = this.player.y - enemy.y;
+        const angle = Math.atan2(dy, dx);
+        
+        enemy.rotation = angle;
+        
+        enemy.setVelocity(
+          Math.cos(angle) * (enemy.speed || this.enemySpeed),
+          Math.sin(angle) * (enemy.speed || this.enemySpeed)
+        );
+      }
     });
   }
 
@@ -450,36 +540,110 @@ export default class GameScene extends Phaser.Scene {
   }
 
   rockHitEnemy(rock, enemy) {
-    // Apply damage
-    enemy.health -= rock.damage;
-    
-    // Destroy rock
-    rock.destroy();
-    
-    // Check if enemy is defeated
-    if (enemy.health <= 0) {
-      // Spawn crystal
-      this.spawnCrystal(enemy.x, enemy.y);
+    // Use the enemy's takeDamage method if it exists
+    if (enemy.takeDamage) {
+      const isDead = enemy.takeDamage(rock.damage);
       
-      // Destroy enemy
-      enemy.destroy();
+      // Destroy rock
+      rock.destroy();
+      
+      if (isDead) {
+        // Spawn crystal
+        this.spawnCrystal(enemy.x, enemy.y);
+        
+        // Add XP
+        this.playerXP += 10;
+        if (this.playerXP >= this.playerMaxXP) {
+          this.events.emit('player-level-up');
+        }
+        
+        // Update UI
+        this.events.emit('update-player-xp', this.playerXP, this.playerMaxXP);
+      }
+    } else {
+      // Fallback for any enemies that might not be using our new system
+      // Prevent damage to blinking enemies
+      if (enemy.isBlinker && enemy.isBlinking) {
+        return;
+      }
+      
+      // Apply damage
+      enemy.health -= rock.damage;
+      
+      // Destroy rock
+      rock.destroy();
+      
+      // Check if enemy is defeated
+      if (enemy.health <= 0) {
+        // Spawn crystal
+        this.spawnCrystal(enemy.x, enemy.y);
+        
+        // Destroy enemy
+        enemy.destroy();
+        
+        // Add XP
+        this.playerXP += 20;
+        if (this.playerXP >= this.playerMaxXP) {
+          this.events.emit('player-level-up');
+        }
+        
+        // Update UI
+        this.events.emit('update-player-xp', this.playerXP, this.playerMaxXP);
+      }
     }
   }
 
   arrowHitEnemy(arrow, enemy) {
-    // Damage enemy
-    enemy.health -= arrow.damage;
-    
-    // Destroy arrow
-    arrow.destroy();
-    
-    // Check if enemy is dead
-    if (enemy.health <= 0) {
-      // Destroy enemy
-      enemy.destroy();
+    // Use the enemy's takeDamage method if it exists
+    if (enemy.takeDamage) {
+      const isDead = enemy.takeDamage(arrow.damage);
       
-      // Spawn crystal
-      this.spawnCrystal(enemy.x, enemy.y);
+      // Destroy arrow
+      arrow.destroy();
+      
+      if (isDead) {
+        // Spawn crystal
+        this.spawnCrystal(enemy.x, enemy.y);
+        
+        // Add XP
+        this.playerXP += 10;
+        if (this.playerXP >= this.playerMaxXP) {
+          this.events.emit('player-level-up');
+        }
+        
+        // Update UI
+        this.events.emit('update-player-xp', this.playerXP, this.playerMaxXP);
+      }
+    } else {
+      // Fallback for any enemies that might not be using our new system
+      // Prevent damage to blinking enemies
+      if (enemy.isBlinker && enemy.isBlinking) {
+        return;
+      }
+      
+      // Damage enemy
+      enemy.health -= arrow.damage;
+      
+      // Destroy arrow
+      arrow.destroy();
+      
+      // Check if enemy is dead
+      if (enemy.health <= 0) {
+        // Destroy enemy
+        enemy.destroy();
+        
+        // Spawn crystal
+        this.spawnCrystal(enemy.x, enemy.y);
+        
+        // Add XP
+        this.playerXP += 10;
+        if (this.playerXP >= this.playerMaxXP) {
+          this.events.emit('player-level-up');
+        }
+        
+        // Update UI
+        this.events.emit('update-player-xp', this.playerXP, this.playerMaxXP);
+      }
     }
   }
 
@@ -489,13 +653,18 @@ export default class GameScene extends Phaser.Scene {
   }
 
   enemyHitPlayer(player, enemy) {
+    // Prevent damage from blinking enemies
+    if (enemy.isBlinker && enemy.isBlinking) {
+      return;
+    }
+    
     // Apply damage to player (only once per second)
-    if (this.time.now - (player.lastDamageTime || 0) > 1000) {
-      player.health -= enemy.damage;
-      player.lastDamageTime = this.time.now;
+    if (this.time.now - (this.player.lastDamageTime || 0) > 1000) {
+      this.playerHealth -= enemy.damage;
+      this.player.lastDamageTime = this.time.now;
       
       // Update UI
-      this.events.emit('update-player-health', player.health, this.playerMaxHealth);
+      this.events.emit('update-player-health', this.playerHealth, this.playerMaxHealth);
       
       // Flash player to indicate damage
       this.tweens.add({
@@ -507,7 +676,7 @@ export default class GameScene extends Phaser.Scene {
       });
       
       // Check for game over
-      if (player.health <= 0) {
+      if (this.playerHealth <= 0) {
         this.gameOver();
       }
     }
@@ -549,14 +718,31 @@ export default class GameScene extends Phaser.Scene {
     // Increase wave number
     this.waveNumber++;
     
-    // Increase enemy stats
-    this.enemyHealth += 10;
-    this.enemyDamage += 2;
-    this.enemySpeed += 5;
+    // Increase enemy stats for all enemy types
+    Object.keys(this.enemySettings).forEach(type => {
+      this.enemySettings[type].health += 10;
+      this.enemySettings[type].damage += 2;
+      this.enemySettings[type].speed += 5;
+    });
     
-    // Increase spawn rate
+    // Increase spawn rates
     this.enemiesPerWave += 2;
     this.enemySpawnRate = Math.max(500, this.enemySpawnRate - 300);
+    
+    // Increase blinker spawn rate if wave 3 or higher
+    if (this.waveNumber >= 3) {
+      this.blinkerSpawnRate = Math.max(2000, this.blinkerSpawnRate - 500);
+    }
+    
+    // Increase zigzag spawn rate if wave 4 or higher
+    if (this.waveNumber >= 4) {
+      this.zigzagSpawnRate = Math.max(3000, this.zigzagSpawnRate - 500);
+    }
+    
+    // Increase circular spawn rate if wave 5 or higher
+    if (this.waveNumber >= 5) {
+      this.circularSpawnRate = Math.max(5000, this.circularSpawnRate - 1000);
+    }
     
     // Update UI
     this.events.emit('update-wave', this.waveNumber);
@@ -596,6 +782,14 @@ export default class GameScene extends Phaser.Scene {
       victory: true, 
       level: this.playerLevel,
       time: this.gameTime
+    });
+  }
+
+  // Listen for enemy death events
+  setupEnemyEvents() {
+    this.events.on('enemy-died', (data) => {
+      // You can add special effects or logic based on enemy type
+      console.log(`Enemy of type ${data.type} died at position ${data.x}, ${data.y}`);
     });
   }
 } 

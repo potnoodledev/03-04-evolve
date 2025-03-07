@@ -50,6 +50,7 @@ export default class BootScene extends Phaser.Scene {
     // Load game assets
     this.load.image('player', 'assets/images/player.png');
     this.load.svg('enemy', 'assets/images/enemy.svg');
+    this.load.svg('blinker_enemy', 'assets/images/blinker_enemy.svg');
     this.load.svg('crystal', 'assets/images/crystal.svg');
     this.load.svg('rock', 'assets/images/rock.svg');
     this.load.svg('bow', 'assets/images/bow.svg');
