@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { EnemyFactory } from '../scripts/enemies';
+import { WeaponManager } from '../scripts/weapons';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -23,23 +24,9 @@ export default class GameScene extends Phaser.Scene {
     this.playerHealth = 100;
     this.playerMaxHealth = 100;
     
-    // Weapon stats
-    this.weaponDamage = 20;
-    this.weaponFireRate = 1000; // ms between shots
+    // Weapon system
+    this.weaponManager = null;
     this.lastFired = 0;
-    this.currentWeapon = 'rock'; // Default weapon
-    
-    // Bow and Arrow stats
-    this.bowDamage = 35; // More damage than rock
-    this.bowFireRate = 1500; // Slower reload than rock
-    this.bowSpeed = 450; // Faster projectile than rock
-    
-    // Stink Bomb stats
-    this.stinkBombDamage = 15; // Less damage per tick but affects multiple enemies
-    this.stinkBombFireRate = 3000; // Slower reload than other weapons
-    this.stinkBombRadius = 150; // Radius of effect
-    this.stinkBombDuration = 3000; // Duration of effect in ms
-    this.stinkBombUnlocked = false; // Unlocked at level 2
     
     // Game settings
     this.gameTime = 0;
@@ -105,9 +92,9 @@ export default class GameScene extends Phaser.Scene {
     // Create groups
     this.enemies = this.physics.add.group();
     this.crystals = this.physics.add.group();
-    this.rocks = this.physics.add.group();
-    this.arrows = this.physics.add.group();
-    this.stinkBombs = this.physics.add.group();
+    
+    // Initialize weapon manager
+    this.weaponManager = new WeaponManager(this);
     
     // Set up collisions
     this.setupCollisions();
@@ -147,7 +134,7 @@ export default class GameScene extends Phaser.Scene {
     this.events.emit('update-player-level', this.playerLevel);
     this.events.emit('update-game-time', this.gameTime, this.gameMaxTime);
     this.events.emit('update-wave', this.waveNumber);
-    this.events.emit('update-weapon', this.currentWeapon);
+    this.events.emit('update-weapon', this.weaponManager.getCurrentWeapon().name);
   }
 
   update(time, delta) {
@@ -255,22 +242,7 @@ export default class GameScene extends Phaser.Scene {
       this
     );
     
-    // Weapon collisions
-    this.physics.add.overlap(
-      this.rocks,
-      this.enemies,
-      this.rockHitEnemy,
-      null,
-      this
-    );
-    
-    this.physics.add.overlap(
-      this.arrows,
-      this.enemies,
-      this.arrowHitEnemy,
-      null,
-      this
-    );
+    // Weapon collisions are now handled by the weapon classes
   }
 
   handlePlayerMovement() {
@@ -319,32 +291,10 @@ export default class GameScene extends Phaser.Scene {
   }
 
   handleWeaponFiring(time) {
-    // Get the current weapon's fire rate
-    let fireRate;
-    if (this.currentWeapon === 'bow') {
-      fireRate = this.bowFireRate;
-    } else if (this.currentWeapon === 'stink_bomb') {
-      fireRate = this.stinkBombFireRate;
-    } else {
-      fireRate = this.weaponFireRate;
-    }
+    const nearestEnemy = this.findNearestEnemy();
     
-    if (time > this.lastFired + fireRate) {
-      if (this.currentWeapon === 'stink_bomb') {
-        this.fireStinkBomb();
-        this.lastFired = time;
-      } else {
-        const nearestEnemy = this.findNearestEnemy();
-        
-        if (nearestEnemy) {
-          if (this.currentWeapon === 'bow') {
-            this.fireArrow(nearestEnemy);
-          } else {
-            this.fireRock(nearestEnemy);
-          }
-          this.lastFired = time;
-        }
-      }
+    if (nearestEnemy) {
+      this.weaponManager.fire(time, nearestEnemy);
     }
   }
 
@@ -365,128 +315,6 @@ export default class GameScene extends Phaser.Scene {
     });
     
     return nearestEnemy;
-  }
-
-  fireRock(target) {
-    const rock = this.rocks.create(this.player.x, this.player.y, 'rock');
-    rock.setDepth(5);
-    
-    // Calculate direction to target
-    const dx = target.x - this.player.x;
-    const dy = target.y - this.player.y;
-    const angle = Math.atan2(dy, dx);
-    
-    // Set rock properties
-    rock.rotation = angle;
-    rock.damage = this.weaponDamage;
-    
-    // Set velocity
-    const speed = 300;
-    rock.setVelocity(
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed
-    );
-    
-    // Destroy rock after 2 seconds
-    this.time.delayedCall(2000, () => {
-      if (rock.active) {
-        rock.destroy();
-      }
-    });
-  }
-
-  fireArrow(target) {
-    const arrow = this.arrows.create(this.player.x, this.player.y, 'bow');
-    arrow.setDepth(5);
-    
-    // Calculate direction to target
-    const dx = target.x - this.player.x;
-    const dy = target.y - this.player.y;
-    const angle = Math.atan2(dy, dx);
-    
-    // Set arrow properties
-    arrow.rotation = angle;
-    arrow.damage = this.bowDamage;
-    
-    // Set velocity
-    arrow.setVelocity(
-      Math.cos(angle) * this.bowSpeed,
-      Math.sin(angle) * this.bowSpeed
-    );
-    
-    // Destroy arrow after 2 seconds
-    this.time.delayedCall(2000, () => {
-      if (arrow.active) {
-        arrow.destroy();
-      }
-    });
-  }
-
-  fireStinkBomb() {
-    // Create stink bomb at player position
-    const stinkBomb = this.stinkBombs.create(this.player.x, this.player.y, 'stink_bomb');
-    stinkBomb.setDepth(5);
-    stinkBomb.setScale(1.5);
-    
-    // Set stink bomb properties
-    stinkBomb.damage = this.stinkBombDamage;
-    stinkBomb.radius = this.stinkBombRadius;
-    
-    // Create visual effect for the radius
-    const radiusCircle = this.add.circle(
-      stinkBomb.x, 
-      stinkBomb.y, 
-      this.stinkBombRadius, 
-      0x7ab317, 
-      0.3
-    );
-    radiusCircle.setDepth(4);
-    
-    // Apply damage to enemies in radius every 500ms
-    const damageInterval = this.time.addEvent({
-      delay: 500,
-      callback: () => {
-        this.applyStinkBombDamage(stinkBomb);
-      },
-      callbackScope: this,
-      loop: true
-    });
-    
-    // Destroy stink bomb and effects after duration
-    this.time.delayedCall(this.stinkBombDuration, () => {
-      if (stinkBomb.active) {
-        stinkBomb.destroy();
-        radiusCircle.destroy();
-        damageInterval.remove();
-      }
-    });
-  }
-
-  applyStinkBombDamage(stinkBomb) {
-    // Get all enemies within the stink bomb radius
-    this.enemies.getChildren().forEach((enemy) => {
-      // Calculate distance between stink bomb and enemy
-      const distance = Phaser.Math.Distance.Between(
-        stinkBomb.x, stinkBomb.y,
-        enemy.x, enemy.y
-      );
-      
-      // If enemy is within radius, apply damage
-      if (distance <= stinkBomb.radius) {
-        // Use the enemy's takeDamage method if it exists
-        if (enemy.takeDamage) {
-          const isDead = enemy.takeDamage(stinkBomb.damage);
-          
-          if (isDead) {
-            // XP is now handled by the enemy-died event
-            // Crystal spawning is now handled by the enemy-died event
-          }
-        } else {
-          // Fallback for enemies without takeDamage method
-          enemy.destroy();
-        }
-      }
-    });
   }
 
   handleEnemySpawning(time) {
@@ -626,49 +454,6 @@ export default class GameScene extends Phaser.Scene {
     this.events.emit('update-player-xp', this.playerXP, this.playerMaxXP);
   }
 
-  rockHitEnemy(rock, enemy) {
-    // Use the enemy's takeDamage method if it exists
-    if (enemy.takeDamage) {
-      const isDead = enemy.takeDamage(rock.damage);
-      
-      // Destroy rock
-      rock.destroy();
-      
-      if (isDead) {
-        // XP is now handled by the enemy-died event
-        // Crystal spawning is now handled by the enemy-died event
-      }
-    } else {
-      // Fallback for enemies without takeDamage method
-      enemy.destroy();
-      rock.destroy();
-    }
-  }
-
-  arrowHitEnemy(arrow, enemy) {
-    // Use the enemy's takeDamage method if it exists
-    if (enemy.takeDamage) {
-      const isDead = enemy.takeDamage(arrow.damage);
-      
-      // Destroy arrow
-      arrow.destroy();
-      
-      if (isDead) {
-        // XP is now handled by the enemy-died event
-        // Crystal spawning is now handled by the enemy-died event
-      }
-    } else {
-      // Fallback for enemies without takeDamage method
-      enemy.destroy();
-      arrow.destroy();
-    }
-  }
-
-  spawnCrystal(x, y) {
-    const crystal = this.crystals.create(x, y, 'crystal');
-    crystal.setDepth(3);
-  }
-
   enemyHitPlayer(player, enemy) {
     // Prevent damage from blinking enemies
     if (enemy.isBlinker && enemy.isBlinking) {
@@ -708,25 +493,22 @@ export default class GameScene extends Phaser.Scene {
     this.playerHealth = this.playerMaxHealth;
     this.playerSpeed += 10;
     
-    // Increase weapon stats
-    this.weaponDamage += 5;
-    this.weaponFireRate = Math.max(200, this.weaponFireRate - 100);
-    
-    // Increase bow stats
-    this.bowDamage += 8;
-    this.bowFireRate = Math.max(300, this.bowFireRate - 75);
-    
-    // Unlock stink bomb at level 2
+    // Upgrade weapons based on level
     if (this.playerLevel === 2) {
-      this.stinkBombUnlocked = true;
-      this.currentWeapon = 'stink_bomb';
-      this.events.emit('update-weapon', this.currentWeapon);
+      this.weaponManager.setCurrentWeapon('stink_bomb');
     }
-    // Unlock bow at level 3
-    else if (this.playerLevel === 3 && this.currentWeapon !== 'stink_bomb') {
-      this.currentWeapon = 'bow';
-      this.events.emit('update-weapon', this.currentWeapon);
+    else if (this.playerLevel === 3) {
+      this.weaponManager.setCurrentWeapon('bow');
     }
+    else if (this.playerLevel === 4) {
+      this.weaponManager.setCurrentWeapon('fireball');
+    }
+    
+    // Upgrade all weapons
+    this.weaponManager.upgradeAllWeapons({
+      damage: this.weaponManager.getCurrentWeapon().damage + 5,
+      fireRate: Math.max(200, this.weaponManager.getCurrentWeapon().fireRate - 100)
+    });
     
     // Increase XP required for next level
     this.playerMaxXP += 50;
@@ -826,5 +608,10 @@ export default class GameScene extends Phaser.Scene {
       // You can add special effects or logic based on enemy type
       console.log(`Enemy of type ${data.type} died at position ${data.x}, ${data.y}`);
     });
+  }
+
+  spawnCrystal(x, y) {
+    const crystal = this.crystals.create(x, y, 'crystal');
+    crystal.setDepth(3);
   }
 } 

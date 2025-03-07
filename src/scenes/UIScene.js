@@ -227,16 +227,21 @@ export default class UIScene extends Phaser.Scene {
     this.waveText.setText(`Wave: ${wave}`);
   }
 
-  updateWeaponDisplay(weapon) {
+  updateWeaponDisplay(weaponKey) {
     // Update weapon icon and text based on current weapon
-    if (weapon === 'bow') {
+    if (weaponKey === 'bow') {
       this.weaponIcon.setTexture('bow');
       this.weaponText.setText('Bow');
-    } else if (weapon === 'stink_bomb') {
+    } else if (weaponKey === 'stink_bomb') {
       this.weaponIcon.setTexture('stink_bomb');
       this.weaponText.setText('Stink Bomb');
+    } else if (weaponKey === 'fireball') {
+      this.weaponIcon.setTexture('rock'); // Using rock texture with tint for now
+      this.weaponIcon.setTint(0xff5500); // Orange tint to match fireball
+      this.weaponText.setText('Fireball');
     } else {
       this.weaponIcon.setTexture('rock');
+      this.weaponIcon.clearTint(); // Clear any tint
       this.weaponText.setText('Rock');
     }
   }
