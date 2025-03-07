@@ -65,15 +65,4 @@ export default class BlinkerEnemy extends Enemy {
     // Call the parent update method for normal movement
     super.update(target);
   }
-  
-  /**
-   * Called when the enemy dies
-   */
-  onDeath() {
-    // Emit an event that can be caught by the game scene
-    this.scene.events.emit('enemy-died', { x: this.x, y: this.y, type: this.type });
-    
-    // Call parent method to destroy the sprite
-    super.onDeath();
-  }
 } 

@@ -232,6 +232,9 @@ export default class UIScene extends Phaser.Scene {
     if (weapon === 'bow') {
       this.weaponIcon.setTexture('bow');
       this.weaponText.setText('Bow');
+    } else if (weapon === 'stink_bomb') {
+      this.weaponIcon.setTexture('stink_bomb');
+      this.weaponText.setText('Stink Bomb');
     } else {
       this.weaponIcon.setTexture('rock');
       this.weaponText.setText('Rock');
